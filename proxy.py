@@ -17,6 +17,15 @@ def ask():
     data = request.get_json()
     question = data.get('question', '')
     
+    # ========== ГЛАВНОЕ ИЗМЕНЕНИЕ ==========
+    # Принимаем system_prompt от сайта (какой ИИ прислал — с таким и работает)
+    # Если сайт не прислал — используем стандартный (на всякий случай)
+    system_prompt = data.get('system_prompt', 'Ты полезный ассистент. Отвечай на русском кратко.')
+    # ======================================
+    
+    print(f"❓ Вопрос: {question}")
+    print(f"📋 Промпт: {system_prompt[:100]}...")  # выведем первые 100 символов промпта в логи
+    
     response = requests.post(
         'https://llm.api.cloud.yandex.net/foundationModels/v1/completion',
         headers={
@@ -27,17 +36,22 @@ def ask():
         json={
             "modelUri": f"gpt://{YANDEX_FOLDER_ID}/yandexgpt-lite",
             "completionOptions": {"temperature": 0.7, "maxTokens": 500},
-            "messages": [{"role": "user", "text": question}]
-        }
+            "messages": [
+                {"role": "system", "text": system_prompt},   # 👈 промпт от сайта
+                {"role": "user", "text": question}
+            ]
+        },
+        timeout=30
     )
     
     if response.status_code != 200:
+        print(f"❌ Ошибка: {response.status_code}")
         return jsonify({'error': f'Ошибка {response.status_code}'}), response.status_code
     
     result = response.json()
     answer = result['result']['alternatives'][0]['message']['text']
     
-    # Возвращаем для сайта простой JSON с полем answer
+    print(f"✅ Ответ: {answer[:100]}...")
     return jsonify({'answer': answer})
 
 @app.route('/health', methods=['GET'])
